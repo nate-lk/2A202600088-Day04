@@ -81,13 +81,28 @@ def search_flights(origin: str, destination: str) -> str:
     Trả về danh sách chuyến bay với hãng, giờ bay, giá vé.
     Nếu không tìm thấy tuyến bay, trả về thông báo không có chuyến.
     """
-    # TODO: Sinh viên tự triển khai
-    # - Tra cứu FLIGHTS_DB với key (origin, destination)
-    # - Nếu tìm thấy -> format danh sách chuyến bay dễ đọc, bao gồm giá tiền
-    # - Nếu không tìm thấy -> thử tra ngược (destination, origin) xem có không,
-    #   nếu cũng không có -> "Không tìm thấy chuyến bay từ X đến Y."
-    # - Gợi ý: format giá tiền có dấu chấm phân cách (1.450.000đ)
-    pass
+    key = (origin, destination)
+    flights = FLIGHTS_DB.get(key)
+
+    # Nếu không tìm thấy, thử tra ngược
+    if not flights:
+        reverse_key = (destination, origin)
+        flights = FLIGHTS_DB.get(reverse_key)
+
+    # Nếu vẫn không có
+    if not flights:
+        return f"Không tìm thấy chuyến bay từ {origin} đến {destination}."
+
+    # Format danh sách chuyến bay dễ đọc
+    result = f"🛫 Chuyến bay từ {origin} đến {destination}:\n"
+    for i, flight in enumerate(flights, 1):
+        price_formatted = f"{flight['price']:,.0f}".replace(",", ".")
+        result += f"\n{i}. {flight['airline']}\n"
+        result += f"   ⏰ Khởi hành: {flight['departure']} → Đến: {flight['arrival']}\n"
+        result += f"   💺 Hạng: {flight['class']}\n"
+        result += f"   💰 Giá: {price_formatted}đ"
+
+    return result
 
 @tool
 def search_hotels(city: str, max_price_per_night: int = 99999999) -> str:
@@ -98,13 +113,34 @@ def search_hotels(city: str, max_price_per_night: int = 99999999) -> str:
     - max_price_per_night: giá tối đa mỗi đêm (VNĐ), mặc định không giới hạn
     Trả về danh sách khách sạn phù hợp với tên, số sao, giá, khu vực, rating.
     """
-    # TODO: Sinh viên tự triển khai
-    # - Tra cứu HOTELS_DB[city]
-    # - Lọc theo max_price_per_night
-    # - Sắp xếp theo rating giảm dần
-    # - Format đẹp. Nếu không có kết quả -> "Không tìm thấy khách sạn tại X
-    #   với giá dưới Y/đêm. Hãy thử tăng ngân sách."
-    pass
+    hotels = HOTELS_DB.get(city)
+
+    # Nếu thành phố không có trong DB
+    if not hotels:
+        return f"Không tìm thấy khách sạn tại {city}."
+
+    # Lọc theo giá tối đa
+    filtered = [h for h in hotels if h['price_per_night'] <= max_price_per_night]
+
+    # Nếu không có kết quả
+    if not filtered:
+        price_formatted = f"{max_price_per_night:,.0f}".replace(",", ".")
+        return f"Không tìm thấy khách sạn tại {city} với giá dưới {price_formatted}đ/đêm. Hãy thử tăng ngân sách."
+
+    # Sắp xếp theo rating giảm dần
+    filtered.sort(key=lambda x: x['rating'], reverse=True)
+
+    # Format danh sách khách sạn
+    result = f"🏨 Khách sạn tại {city}:\n"
+    for i, hotel in enumerate(filtered, 1):
+        price_formatted = f"{hotel['price_per_night']:,.0f}".replace(",", ".")
+        stars = "⭐" * hotel['stars']
+        result += f"\n{i}. {hotel['name']} {stars}\n"
+        result += f"   📍 Khu vực: {hotel['area']}\n"
+        result += f"   ⭐ Rating: {hotel['rating']}/5\n"
+        result += f"   💰 Giá: {price_formatted}đ/đêm"
+
+    return result
 
 @tool
 def calculate_budget(total_budget: int, expenses: str) -> str:
@@ -117,18 +153,48 @@ def calculate_budget(total_budget: int, expenses: str) -> str:
     Trả về bảng chi tiết các khoản chi và số tiền còn lại.
     Nếu vượt ngân sách, cảnh báo rõ ràng số tiền thiếu.
     """
-    # TODO: Sinh viên tự triển khai
-    # - Parse chuỗi expenses thành dict {tên: số_tiền}
-    # - Tính tổng chi phí
-    # - Tính số tiền còn lại = total_budget - tổng chi phí
-    # - Format bảng chi tiết:
-    #     Bảng chi phí:
-    #     - Vé máy bay: 890.000đ
-    #     - Khách sạn: 650.000đ
-    #     ---
-    #     Tổng chi: 1.540.000đ
-    #     Ngân sách: 5.000.000đ
-    #     Còn lại: 3.460.000đ
-    # - Nếu âm -> "Vượt ngân sách X đồng! Cần điều chỉnh."
-    # - Xử lý lỗi: nếu expenses format sai -> trả về thông báo lỗi rõ ràng
-    pass
+    try:
+        # Parse chuỗi expenses thành dict
+        expense_dict = {}
+        if expenses.strip():
+            for item in expenses.split(","):
+                parts = item.strip().split(":")
+                if len(parts) != 2:
+                    return f"❌ Lỗi: Format chi phí sai. Vui lòng dùng 'tên:số_tiền' (VD: 'vé_máy_bay:890000')"
+                name, amount_str = parts
+                try:
+                    amount = int(amount_str.strip())
+                    expense_dict[name.strip()] = amount
+                except ValueError:
+                    return f"❌ Lỗi: Số tiền '{amount_str}' không hợp lệ. Vui lòng nhập số nguyên."
+
+        # Tính tổng chi phí
+        total_expenses = sum(expense_dict.values())
+
+        # Tính số tiền còn lại
+        remaining = total_budget - total_expenses
+
+        # Format bảng chi tiết
+        result = "💰 Bảng chi phí:\n"
+        for name, amount in expense_dict.items():
+            amount_formatted = f"{amount:,.0f}".replace(",", ".")
+            result += f"- {name}: {amount_formatted}đ\n"
+
+        result += "---\n"
+        total_expenses_formatted = f"{total_expenses:,.0f}".replace(",", ".")
+        total_budget_formatted = f"{total_budget:,.0f}".replace(",", ".")
+        remaining_formatted = f"{abs(remaining):,.0f}".replace(",", ".")
+
+        result += f"Tổng chi: {total_expenses_formatted}đ\n"
+        result += f"Ngân sách: {total_budget_formatted}đ\n"
+
+        if remaining >= 0:
+            result += f"Còn lại: {remaining_formatted}đ ✅"
+        else:
+            result += f"Còn lại: -{remaining_formatted}đ\n"
+            result += f"⚠️ Vượt ngân sách {remaining_formatted}đ! Cần điều chỉnh."
+
+        return result
+
+    except Exception as e:
+        return f"❌ Lỗi xảy ra: {str(e)}"
