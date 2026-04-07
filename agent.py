@@ -61,12 +61,19 @@ if __name__ == "__main__":
     print("    Gõ 'quit' để thoát")
     print("=" * 60)
 
+    conversation_history = []  
+
     while True:
         user_input = input("\nBạn: ").strip()
         if user_input.lower() in ("quit", "exit", "q"):
             break
 
+        conversation_history.append(("human", user_input))
+        conversation_history = conversation_history[-4:]  
         print("\nTravelBuddy đang suy nghĩ...")
-        result = graph.invoke({"messages": [("human", user_input)]})
+        result = graph.invoke({"messages": conversation_history}) 
+        
         final = result["messages"][-1]
         print(f"\nTravelBuddy: {final.content}")
+
+        conversation_history = result["messages"] 
